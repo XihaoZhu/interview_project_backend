@@ -1,11 +1,13 @@
 from django.db import models
+from django.utils import timezone
 
 class Event(models.Model):
     """
     Thre regular event model
     I build creat and modify time too even I don't plan to use it here as it's for interview purpose. 
     """
-    id = models.AutoField(primary_key=True) 
+    id = models.AutoField(primary_key=True)
+    title = models.CharField(max_length=200, blank=False) 
     link = models.URLField(blank=True, null=True)
     note = models.TextField(blank=True)
     extra_info = models.CharField(blank=True, null=True,max_length=30)
@@ -48,6 +50,11 @@ class EventException(models.Model):
     new_end_time = models.DateTimeField(null=True, blank=True)
     new_title = models.CharField(max_length=200, blank=True, null=True)
     new_description = models.TextField(blank=True, null=True)
+    new_link = models.URLField(blank=True, null=True)
+    new_extra_info = models.CharField(max_length=30, blank=True, null=True)
+    new_note = models.TextField(blank=True, null=True)
+    new_type = models.CharField(choices=[("meeting", "meeting"), ("event", "event"),("first time appointment", "first time appointment"),("presentation", "presentation")], max_length=50, blank=True, null=True)
 
+    modified_at = models.DateTimeField(auto_now=True)
     def __str__(self):
         return f"{self.event.title} exception on {self.occurrence_date}"
