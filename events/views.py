@@ -20,14 +20,15 @@ class EventViewSet(viewsets.ModelViewSet):
 
     #take start and end time to filter and return events
     def list(self, request, *args, **kwargs):
-        type = request.query_params.get("type", None)
+
+        event_type = request.query_params.get("type", None)
         start_time = request.query_params.get("start")
         end_time = request.query_params.get("end")
         user_tz = request.query_params.get("timezone")
 
         if not (start_time and end_time and user_tz):
             return Response(
-            {"error": "'start_time date', 'end_time date' and 'local timezone' query parameters are required."},
+            {"error": "'start', 'end' and 'timezone' query parameters are required."},
             status=status.HTTP_400_BAD_REQUEST
         )
         
@@ -57,14 +58,14 @@ class EventViewSet(viewsets.ModelViewSet):
         )
 
         #Now filter by type if provided
-        if type:
-            events_list = events_list.filter(type=type)
+        if event_type:
+            events_list = events_list.filter(type=event_type)
 
         #repeating events
         rrule_events = Event.objects.exclude(repeat_rule__isnull=True).exclude(repeat_rule__exact='')
         
-        if type:
-            rrule_events = rrule_events.filter(type=type)
+        if event_type:
+            rrule_events = rrule_events.filter(type=event_type)
         
         occurrences_list = []
 
@@ -109,4 +110,25 @@ class EventViewSet(viewsets.ModelViewSet):
         #serialize and return
         serializer = self.get_serializer(list(events_list)+occurrences_list, many=True)
         return Response(serializer.data)
+ 
+    #Create, validate and save new event        
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+
+        serializer.is_valid(raise_exception=True)
+
+        event = serializer.save()
+
+        return Response(
+            self.get_serializer(event).data,
+            status=status.HTTP_201_CREATED
+        )
     
+    #update existing event
+    def partial_update(self, request, *args, **kwargs):
+        mutable_data = request.data.copy()
+        for field in ['id', 'created_at', 'updated_at']:
+            mutable_data.pop(field, None)
+        return super().partial_update(request, *args, **kwargs, data=mutable_data)                                                                                                                                                                                                                                                                                                      
+
+    #delete cann just use the default destroy method                                                                                                                                                                                                                                                                                                                                                                                                                                       

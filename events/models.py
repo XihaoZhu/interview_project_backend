@@ -12,10 +12,11 @@ class Event(models.Model):
     note = models.TextField(blank=True)
     extra_info = models.CharField(blank=True, null=True,max_length=30)
     start_time = models.DateTimeField()
+    buid_timeZone = models.CharField(max_length=50, blank=False, default="UTC")
     end_time = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    type = models.CharField(choices=[("meeting", "meeting"), ("event", "event"),("first time appointment", "first time appointment"),("presentation", "presentation")], max_length=50)
+    type = models.CharField(choices=[("meeting", "meeting"), ("event", "event"),("first_appointment", "first_appointment"),("presentation", "presentation")], max_length=50)
 
     # for rrule
     repeat_rule = models.TextField(blank=True, null=True)
