@@ -3,10 +3,10 @@ from .models import Event, EventException
 
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
-    list_display = ('title', 'parent')
+    list_display = ('title', 'parent','id')
     search_fields = ('id','note')
 
 @admin.register(EventException)
 class EventExceptionAdmin(admin.ModelAdmin):
-    list_display = ('event', 'occurrence_date', 'exception_type')
+    list_display = ('sub_id','event', 'occurrence_time', 'exception_type')
     search_fields = ('event__title',)

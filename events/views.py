@@ -9,6 +9,7 @@ from dateutil import rrule
 from datetime import datetime, time
 from zoneinfo import ZoneInfo   
 from dateutil.rrule import rrulestr
+from django.shortcuts import get_object_or_404
 
 from .models import Event, EventException
 from .serializers import EventSerializer, EventExceptionSerializer
@@ -71,9 +72,11 @@ class EventViewSet(viewsets.ModelViewSet):
 
         for event in rrule_events:
 
-            dtstart = event.start_time
+            # To handle the day light saving time change, my idea is to transform the event start time to the event local timezone, then let rrule parse the rule.
+            localTimezone = event.buid_timeZone if event.buid_timeZone else 'UTC'
+            localStart = event.start_time.astimezone(ZoneInfo(localTimezone))
             
-            rule = rrulestr(event.repeat_rule, dtstart=dtstart)
+            rule = rrulestr(event.repeat_rule, dtstart=localStart)
 
             occurrences = rule.between(start_time,end_time, inc=True)
 
@@ -87,23 +90,20 @@ class EventViewSet(viewsets.ModelViewSet):
                 occ_end = occ_start + duration
 
                 # check for exceptions
-                exception = event.exceptions.filter(occurrence_date=occ_start).first()
+                exception = event.exceptions.filter(occurrence_time=occ_start).first()
                 if exception:
                     if exception.exception_type == "skip":
                         continue
-                    elif exception.exception_type == "modify":
-                        occ_start = exception.new_start_time or occ_start
-                        occ_end   = exception.new_end_time   or occ_end
 
                 occurrences_list.append({
-                    "id": event.id,
+                    "mother_id": event.id,
                     "occurrence_id": f"{event.id}_{int(occ_start.timestamp())}",
                     "title": exception.new_title if exception and exception.new_title else event.title,
                     "note": exception.new_note if exception and exception.new_note else event.note,
                     "link": exception.new_link if exception and exception.new_link else event.link,
                     "extra_info": exception.new_extra_info if exception and exception.new_extra_info else event.extra_info,
-                    "start_time": occ_start,
-                    "end_time": occ_end,
+                    "start_time": exception.new_start_time,
+                    "end_time": exception.new_end_time,
                     "type": exception.new_type if exception and exception.new_type else event.type,
                 })
 
@@ -131,4 +131,55 @@ class EventViewSet(viewsets.ModelViewSet):
             mutable_data.pop(field, None)
         return super().partial_update(request, *args, **kwargs, data=mutable_data)                                                                                                                                                                                                                                                                                                      
 
-    #delete cann just use the default destroy method                                                                                                                                                                                                                                                                                                                                                                                                                                       
+    #delete cann just use the default destroy method                                                                                                       
+
+'''My logic for handling exceptions for repeating events.
+    it's regular for create of both skip and modify type.   
+    but for delete function, you can't delete skip as it's not shown in the list
+    and for modify, delete it I will just change the type to skip so it won't be selectable too
+    hhhhhhhhhhh
+    '''
+
+class EventExceptionViewSet(viewsets.ModelViewSet):
+    serializer_class = EventExceptionSerializer
+    queryset = EventException.objects.all()
+
+    def create(self, request, *args, **kwargs):
+
+        data = request.data.copy()
+
+        occurrence_time = data.get("occurrence_time")
+        if not occurrence_time:
+            return Response({"error": "occurrence_time is required, need it to target which one"}, status=400)
+        
+        event_id = data.get("mother_id")
+        if not event_id:
+            return Response({"error": "You need a mother event to create exception"}, status=400)
+
+        event = get_object_or_404(Event, id=event_id)
+
+        for field, default in [
+        ("new_start_time", event.start_time),
+        ("new_end_time", event.end_time),
+        ("new_title", event.title),
+        ("new_description", event.note),
+        ("new_link", event.link),
+        ("new_extra_info", event.extra_info),
+        ("new_note", event.note),
+        ("new_type", event.type)
+    ]:
+            if data.get(field) is None:
+                data[field] = default
+
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(event=event)
+
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    def partial_update(self, request, *args, **kwargs):
+        mutable_data = request.data.copy()
+        for field in ['sub_id', 'modified_at']:
+            mutable_data.pop(field, None)
+        return super().partial_update(request, *args, **kwargs, data=mutable_data)   
+# the destroy method remains original, maybe admin can use it for some reason   

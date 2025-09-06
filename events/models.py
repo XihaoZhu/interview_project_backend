@@ -40,7 +40,9 @@ class EventException(models.Model):
     """
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name="exceptions")
 
-    occurrence_date = models.DateTimeField() 
+    sub_id = models.AutoField(primary_key=True)
+
+    occurrence_time = models.DateTimeField() 
 
     exception_type = models.CharField(
         max_length=20,
@@ -58,4 +60,4 @@ class EventException(models.Model):
 
     modified_at = models.DateTimeField(auto_now=True)
     def __str__(self):
-        return f"{self.event.title} exception on {self.occurrence_date}"
+        return f"{self.event.title} exception on {self.occurrence_time}"
