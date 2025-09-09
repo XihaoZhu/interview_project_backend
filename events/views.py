@@ -102,8 +102,8 @@ class EventViewSet(viewsets.ModelViewSet):
                     "note": exception.new_note if exception and exception.new_note else event.note,
                     "link": exception.new_link if exception and exception.new_link else event.link,
                     "extra_info": exception.new_extra_info if exception and exception.new_extra_info else event.extra_info,
-                    "start_time": exception.new_start_time,
-                    "end_time": exception.new_end_time,
+                    "start_time": exception.new_start_time if exception and exception.new_start_time else occ_start,
+                    "end_time": exception.new_end_time if exception and exception.new_end_time else occ_end,
                     "type": exception.new_type if exception and exception.new_type else event.type,
                 })
 
