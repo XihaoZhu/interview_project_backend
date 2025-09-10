@@ -78,15 +78,14 @@ class EventViewSet(viewsets.ModelViewSet):
             
             rule = rrulestr(event.repeat_rule, dtstart=localStart)
 
-            occurrences = rule.between(start_time,end_time, inc=True)
+            occurrences = rule.between(start_time.astimezone(ZoneInfo(localTimezone)),end_time.astimezone(ZoneInfo(localTimezone)), inc=True)
 
             #because it was timestamp we stored instead of time and date, so calculate duration to get end time
             duration = event.end_time - event.start_time
 
             for occ_start in occurrences:
-                if is_naive(occ_start):
-                    occ_start = make_aware(occ_start, timezone=timezone.utc)
-
+                
+                occ_start = occ_start.astimezone(timezone.utc)
                 occ_end = occ_start + duration
 
                 # check for exceptions
