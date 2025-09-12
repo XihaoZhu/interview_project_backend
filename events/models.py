@@ -57,6 +57,7 @@ class EventException(models.Model):
     new_extra_info = models.CharField(max_length=30, blank=True, null=True)
     new_note = models.TextField(blank=True, null=True)
     new_type = models.CharField(choices=[("meeting", "meeting"), ("event", "event"),("first time appointment", "first time appointment"),("presentation", "presentation")], max_length=50, blank=True, null=True)
+    apply_range = models.CharField(choices=[("This time", "This time"), ("This and future", "This and future"),("All time","All time")],default="only_this")
 
     modified_at = models.DateTimeField(auto_now=True)
     def __str__(self):

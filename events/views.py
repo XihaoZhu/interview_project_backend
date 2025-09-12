@@ -83,16 +83,29 @@ class EventViewSet(viewsets.ModelViewSet):
             #because it was timestamp we stored instead of time and date, so calculate duration to get end time
             duration = event.end_time - event.start_time
 
+            # get all exceptions for this event
+            exceptions = list(event.exceptions.all())
+
             for occ_start in occurrences:
                 
                 occ_start = occ_start.astimezone(timezone.utc)
                 occ_end = occ_start + duration
 
-                # check for exceptions
-                exception = event.exceptions.filter(occurrence_time=occ_start).first()
-                if exception:
-                    if exception.exception_type == "skip":
-                        continue
+                exception = None
+                for ex in exceptions:
+                    if ex.apply_range == "This time" and ex.occurrence_time == occ_start:
+                        exception = ex
+                        break
+                    elif ex.apply_range == "This and future" and ex.occurrence_time <= occ_start:
+                        exception = ex
+                        break
+                    elif ex.apply_range == "All time":
+                        exception = ex
+                        break
+                
+                if exception and exception.exception_type == "skip":
+                    continue
+
 
                 occurrences_list.append({
                     "parent": exception.event if exception else event,
