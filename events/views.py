@@ -121,13 +121,14 @@ class EventViewSet(viewsets.ModelViewSet):
                 occurrences_list.append({
                     "parent": exception_to_apply.event if exception_to_apply else event,
                     "sub_id": exception_to_apply.sub_id if exception_to_apply else None,
-                    "occurrence_time": occ_start,
+                    "occurrence_time": exception_to_apply.occurrence_time if exception_to_apply else occ_start,
                     "title": exception_to_apply.new_title if exception_to_apply and exception_to_apply.new_title else       event.title,
                     "note": exception_to_apply.new_note if exception_to_apply and exception_to_apply.new_note else event.       note,
                     "link": exception_to_apply.new_link if exception_to_apply and exception_to_apply.new_link else event.       link,
                     "extra_info": exception_to_apply.new_extra_info if exception_to_apply and exception_to_apply.       new_extra_info else event.extra_info,
-                    "start_time": occ_start,
-                    "end_time": occ_end,
+                    "start_time": occ_start if not exception_to_apply else (exception_to_apply.new_start_time if exception_to_apply.apply_range == "This time" else occ_start + (exception_to_apply.new_start_time - exception_to_apply.occurrence_time)),
+                    "end_time": occ_end if not exception_to_apply else (exception_to_apply.new_end_time if exception_to_apply.apply_range == "This time"else occ_end + (exception_to_apply.new_end_time - exception_to_apply.occurrence_time)
+    ),
                     "type": exception_to_apply.new_type if exception_to_apply and exception_to_apply.new_type else event.       type,
                 })
         #serialize and return
@@ -181,18 +182,19 @@ class EventExceptionViewSet(viewsets.ModelViewSet):
 
         event = get_object_or_404(Event, id=event_id)
 
-        for field, default in [
-        ("new_start_time", event.start_time),
-        ("new_end_time", event.end_time),
-        ("new_title", event.title),
-        ("new_description", event.note),
-        ("new_link", event.link),
-        ("new_extra_info", event.extra_info),
-        ("new_note", event.note),
-        ("new_type", event.type)
-    ]:
-            if data.get(field) is None:
-                data[field] = default
+        defaults = {
+            "new_start_time": event.start_time,
+            "new_end_time": event.end_time,
+            "new_title": event.title,
+            "new_description": event.note,
+            "new_link": event.link,
+            "new_extra_info": event.extra_info,
+            "new_note": event.note,
+            "new_type": event.type
+        }
+
+        for key, value in defaults.items():
+            data.setdefault(key, value)
 
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
@@ -202,7 +204,8 @@ class EventExceptionViewSet(viewsets.ModelViewSet):
 
     def partial_update(self, request, *args, **kwargs):
         mutable_data = request.data.copy()
-        for field in ['sub_id', 'modified_at','occurrence_time']:
+        for field in ['sub_id', 'occurrence_time','event', 'modified_at']:
             mutable_data.pop(field, None)
+
         return super().partial_update(request, *args, **kwargs, data=mutable_data)   
 # the destroy method remains original, maybe admin can use it for some reason   
