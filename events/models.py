@@ -18,6 +18,7 @@ class Event(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     occurrence_time = models.DateTimeField()
     type = models.CharField(choices=[("meeting", "meeting"), ("event", "event"),("first_appointment", "first_appointment"),("presentation", "presentation")], max_length=50)
+    sub_id = models.TextField(blank=True,null=True)
 
     # for rrule
     repeat_rule = models.TextField(blank=True, null=True)

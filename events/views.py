@@ -72,54 +72,64 @@ class EventViewSet(viewsets.ModelViewSet):
 
         for event in rrule_events:
 
-            # To handle the day light saving time change, my idea is to transform the event start time to the event local timezone, then let rrule parse the rule.
             localTimezone = event.buid_timeZone if event.buid_timeZone else 'UTC'
             localStart = event.start_time.astimezone(ZoneInfo(localTimezone))
-            
+
             rule = rrulestr(event.repeat_rule, dtstart=localStart)
 
-            occurrences = rule.between(start_time.astimezone(ZoneInfo(localTimezone)),end_time.astimezone(ZoneInfo(localTimezone)), inc=True)
+            occurrences = rule.between(
+                start_time.astimezone(ZoneInfo(localTimezone)),
+                end_time.astimezone(ZoneInfo(localTimezone)),
+                inc=True
+            )
 
-            #because it was timestamp we stored instead of time and date, so calculate duration to get end time
             duration = event.end_time - event.start_time
-
-            # get all exceptions for this event
             exceptions = list(event.exceptions.all())
 
             for occ_start in occurrences:
-                
+            
                 occ_start = occ_start.astimezone(timezone.utc)
                 occ_end = occ_start + duration
 
-                exception = None
+                exception_to_apply = None
+
                 for ex in exceptions:
-                    if ex.apply_range == "This time" and ex.occurrence_time == occ_start:
-                        exception = ex
+                    if ex.apply_range == "All time":
+                        exception_to_apply = ex
                         break
-                    elif ex.apply_range == "This and future" and ex.occurrence_time <= occ_start:
-                        exception = ex
+                    elif ex.apply_range == "This and future" and occ_start >= ex.occurrence_time:
+                        exception_to_apply = ex
                         break
-                    elif ex.apply_range == "All time":
-                        exception = ex
+                    elif ex.apply_range == "This time" and occ_start == ex.occurrence_time:
+                        exception_to_apply = ex
                         break
-                
-                if exception and exception.exception_type == "skip":
-                    continue
+                    
+                if exception_to_apply:
+                    if exception_to_apply.exception_type == "skip":
+                        continue
+                    elif exception_to_apply.exception_type == "modify":
+                        if exception_to_apply.apply_range == "This time":
+                            occ_start = exception_to_apply.new_start_time
+                            occ_end = exception_to_apply.new_end_time
+                        else: 
+                            delta = exception_to_apply.new_start_time - exception_to_apply.occurrence_time
+                            occ_start = occ_start + delta
+                            occ_end = occ_end + delta
+
 
 
                 occurrences_list.append({
-                    "parent": exception.event if exception else event,
-                    "sub_id": exception.sub_id if exception else None,
-                    "occurrence_time": exception.occurrence_time if exception and exception.new_start_time else occ_start,
-                    "title": exception.new_title if exception and exception.new_title else event.title,
-                    "note": exception.new_note if exception and exception.new_note else event.note,
-                    "link": exception.new_link if exception and exception.new_link else event.link,
-                    "extra_info": exception.new_extra_info if exception and exception.new_extra_info else event.extra_info,
-                    "start_time": exception.new_start_time if exception and exception.new_start_time else occ_start,
-                    "end_time": exception.new_end_time if exception and exception.new_end_time else occ_end,
-                    "type": exception.new_type if exception and exception.new_type else event.type,
+                    "parent": exception_to_apply.event if exception_to_apply else event,
+                    "sub_id": exception_to_apply.sub_id if exception_to_apply else None,
+                    "occurrence_time": occ_start,
+                    "title": exception_to_apply.new_title if exception_to_apply and exception_to_apply.new_title else       event.title,
+                    "note": exception_to_apply.new_note if exception_to_apply and exception_to_apply.new_note else event.       note,
+                    "link": exception_to_apply.new_link if exception_to_apply and exception_to_apply.new_link else event.       link,
+                    "extra_info": exception_to_apply.new_extra_info if exception_to_apply and exception_to_apply.       new_extra_info else event.extra_info,
+                    "start_time": occ_start,
+                    "end_time": occ_end,
+                    "type": exception_to_apply.new_type if exception_to_apply and exception_to_apply.new_type else event.       type,
                 })
-
         #serialize and return
         serializer = self.get_serializer(list(events_list)+occurrences_list, many=True)
         return Response(serializer.data)
@@ -192,7 +202,7 @@ class EventExceptionViewSet(viewsets.ModelViewSet):
 
     def partial_update(self, request, *args, **kwargs):
         mutable_data = request.data.copy()
-        for field in ['sub_id', 'modified_at']:
+        for field in ['sub_id', 'modified_at', 'occurrence_time']:
             mutable_data.pop(field, None)
         return super().partial_update(request, *args, **kwargs, data=mutable_data)   
 # the destroy method remains original, maybe admin can use it for some reason   
