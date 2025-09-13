@@ -87,23 +87,23 @@ class EventViewSet(viewsets.ModelViewSet):
             exceptions = list(event.exceptions.all())
 
             for occ_start in occurrences:
-            
                 occ_start = occ_start.astimezone(timezone.utc)
                 occ_end = occ_start + duration
 
-                exception_to_apply = None
+                candidates = []
 
                 for ex in exceptions:
                     if ex.apply_range == "All time":
-                        exception_to_apply = ex
-                        break
-                    elif ex.apply_range == "This and future" and occ_start >= ex.occurrence_time:
-                        exception_to_apply = ex
-                        break
-                    elif ex.apply_range == "This time" and occ_start == ex.occurrence_time:
-                        exception_to_apply = ex
-                        break
-                    
+                        candidates.append((1, ex))  # lowest priority
+                    elif ex.apply_range == "This and future":
+                        if ex.occurrence_time and occ_start >= ex.occurrence_time:
+                            candidates.append((2, ex))  # medium priority
+                    elif ex.apply_range == "This time":
+                        if occ_start == ex.occurrence_time:
+                            candidates.append((3, ex))  # highest priority
+
+                exception_to_apply = max(candidates, key=lambda x: x[0])[1] if candidates else None
+
                 if exception_to_apply:
                     if exception_to_apply.exception_type == "skip":
                         continue
@@ -202,7 +202,7 @@ class EventExceptionViewSet(viewsets.ModelViewSet):
 
     def partial_update(self, request, *args, **kwargs):
         mutable_data = request.data.copy()
-        for field in ['sub_id', 'modified_at', 'occurrence_time']:
+        for field in ['sub_id', 'modified_at','occurrence_time']:
             mutable_data.pop(field, None)
         return super().partial_update(request, *args, **kwargs, data=mutable_data)   
 # the destroy method remains original, maybe admin can use it for some reason   

@@ -6,7 +6,7 @@ class EventSerializer(serializers.ModelSerializer):
     class Meta:
         model = Event
         fields = '__all__'
-        read_only_fields = ['id', 'created_at', 'updated_at', 'parent']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'parent', 'occurrence_time']
 
     def validate(self, attrs):
         start = attrs.get("start_time") or getattr(self.instance, "start_time", None)
