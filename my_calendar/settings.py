@@ -79,9 +79,9 @@ WSGI_APPLICATION = 'my_calendar.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'events_db',
-        'USER': 'admin_user',
-        'PASSWORD': 'admin',
+        'NAME': 'new_events_db',
+        'USER': 'postgres',
+        'PASSWORD': '050573',
         'HOST': 'localhost',
         'PORT': '5432',
     }

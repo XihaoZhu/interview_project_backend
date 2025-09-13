@@ -13,9 +13,10 @@ class Event(models.Model):
     extra_info = models.CharField(blank=True, null=True,max_length=30)
     start_time = models.DateTimeField()
     buid_timeZone = models.CharField(max_length=50, blank=False, default="UTC")
-    end_time = models.DateTimeField()
+    end_time = models.DateTimeField(blank=True,null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    occurrence_time = models.DateTimeField()
     type = models.CharField(choices=[("meeting", "meeting"), ("event", "event"),("first_appointment", "first_appointment"),("presentation", "presentation")], max_length=50)
 
     # for rrule
@@ -29,6 +30,11 @@ class Event(models.Model):
         on_delete=models.CASCADE,
         related_name="occurrences"
     )
+
+    def save(self, *args, **kwargs):
+        if not self.occurrence_time:
+            self.occurrence_time = self.start_time
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.title
@@ -57,7 +63,7 @@ class EventException(models.Model):
     new_extra_info = models.CharField(max_length=30, blank=True, null=True)
     new_note = models.TextField(blank=True, null=True)
     new_type = models.CharField(choices=[("meeting", "meeting"), ("event", "event"),("first time appointment", "first time appointment"),("presentation", "presentation")], max_length=50, blank=True, null=True)
-    apply_range = models.CharField(choices=[("This time", "This time"), ("This and future", "This and future"),("All time","All time")],default="only_this")
+    apply_range = models.CharField(choices=[("This time", "This time"), ("This and future", "This and future"),("All time","All time")],default="This time")
 
     modified_at = models.DateTimeField(auto_now=True)
     def __str__(self):

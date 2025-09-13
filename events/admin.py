@@ -5,6 +5,7 @@ from .models import Event, EventException
 class EventAdmin(admin.ModelAdmin):
     list_display = ('title', 'parent','id')
     search_fields = ('id','note')
+    actions= ['delete_selected']
 
 @admin.register(EventException)
 class EventExceptionAdmin(admin.ModelAdmin):

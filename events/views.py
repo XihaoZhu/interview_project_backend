@@ -110,7 +110,7 @@ class EventViewSet(viewsets.ModelViewSet):
                 occurrences_list.append({
                     "parent": exception.event if exception else event,
                     "sub_id": exception.sub_id if exception else None,
-                    "occurrence_id": f"{event.id}_{int(occ_start.timestamp())}",
+                    "occurrence_time": exception.occurrence_time if exception and exception.new_start_time else occ_start,
                     "title": exception.new_title if exception and exception.new_title else event.title,
                     "note": exception.new_note if exception and exception.new_note else event.note,
                     "link": exception.new_link if exception and exception.new_link else event.link,
