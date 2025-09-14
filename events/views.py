@@ -10,6 +10,7 @@ from datetime import datetime, time
 from zoneinfo import ZoneInfo   
 from dateutil.rrule import rrulestr
 from django.shortcuts import get_object_or_404
+import copy
 
 from .models import Event, EventException
 from .serializers import EventSerializer, EventExceptionSerializer
@@ -104,6 +105,8 @@ class EventViewSet(viewsets.ModelViewSet):
                     None
                 )
 
+                this_time_ex=False
+
                 if thistime_ex:
                     # if it's this time skip, do nothing so the occ won't be appendded on list
                     if thistime_ex.exception_type == "skip":
@@ -113,13 +116,16 @@ class EventViewSet(viewsets.ModelViewSet):
                         occ_start = thistime_ex.new_start_time
                         occ_end = thistime_ex.new_end_time
                         applied_sub_id = thistime_ex.sub_id
+                        this_time_ex=True   
 
                 else:
                     # find the newest all time or future exception which can hit the occ
                     future_ex = next(
                         (ex for ex in all_exceptions
-                         if ex.apply_range in ("This and future", "All time")
-                         and occ_start >= ex.occurrence_time),
+                        if (
+                            (ex.apply_range == "This and future" and occ_start >= ex.occurrence_time)
+                            or ex.apply_range == "All time")
+                        ),
                         None
                     )
                     if future_ex:
@@ -132,19 +138,14 @@ class EventViewSet(viewsets.ModelViewSet):
                             applied_sub_id = future_ex.sub_id
                             applied_exception = future_ex
 
-                
-                final_occurrences.append({
-                    "parent": event,
-                    "sub_id": applied_sub_id,
-                    "occurrence_time": occurrence_time,
-                    "title": event.title,
-                    "note": event.note,
-                    "link": event.link,
-                    "extra_info": event.extra_info,
-                    "start_time": occ_start,
-                    "end_time": occ_end,
-                    "type": event.type,
-                })
+                event_copy = copy.copy(event) 
+                event_copy.start_time = occ_start
+                event_copy.end_time = occ_end
+                event_copy.occurrence_time = occurrence_time
+                event_copy.sub_id = applied_sub_id
+                event_copy.this_time_ex = this_time_ex 
+
+                final_occurrences.append(event_copy)
 
 
             occurrences_list.extend(final_occurrences)

@@ -3,6 +3,8 @@ from .models import Event, EventException
 
 
 class EventSerializer(serializers.ModelSerializer):
+    this_time_ex = serializers.SerializerMethodField()
+    
     class Meta:
         model = Event
         fields = '__all__'
@@ -23,8 +25,10 @@ class EventSerializer(serializers.ModelSerializer):
         if rrule:
             if not rrule.strip().upper().startswith("FREQ="):
                 raise serializers.ValidationError("repeat_rule must start with 'FREQ='")
-
         return attrs
+    
+    def get_this_time_ex(self, obj):
+        return getattr(obj, "this_time_ex", False)
 
 
 class EventExceptionSerializer(serializers.ModelSerializer):
