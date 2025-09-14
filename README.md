@@ -17,6 +17,7 @@ Handles events, recurring rules (rrule), exceptions, and timezone-aware date ope
 ## What I’d Do Next With More Time
 - Orgnize the code. Sorry for who has to review this. I know it's not very easily readable but not a really complex one too.
 - Add access limit.
+- More test cases. I didn't spend time on test cases. Just to show I can write it so I still put two cases there.
 
 
 ## Before you run
