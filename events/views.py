@@ -71,66 +71,93 @@ class EventViewSet(viewsets.ModelViewSet):
         occurrences_list = []
 
         for event in rrule_events:
-
-            localTimezone = event.buid_timeZone if event.buid_timeZone else 'UTC'
-            localStart = event.start_time.astimezone(ZoneInfo(localTimezone))
-
+            localStart = event.start_time.astimezone(user_tz)
             rule = rrulestr(event.repeat_rule, dtstart=localStart)
 
+            #occurrences
             occurrences = rule.between(
-                start_time.astimezone(ZoneInfo(localTimezone)),
-                end_time.astimezone(ZoneInfo(localTimezone)),
+                start_time.astimezone(user_tz),
+                end_time.astimezone(user_tz),
                 inc=True
             )
-
+            
             duration = event.end_time - event.start_time
             exceptions = list(event.exceptions.all())
 
-            for occ_start in occurrences:
+            # sort exceptions
+            all_exceptions = sorted(exceptions, key=lambda ex: (
+                {'All time': 1, 'This and future': 2, 'This time': 3}[ex.apply_range],
+                ex.modified_at or datetime.min
+            ),reverse=True)
+
+            # what we need
+            final_occurrences = []
+
+            for i, occ_start in enumerate(occurrences):
                 occ_start = occ_start.astimezone(timezone.utc)
                 occ_end = occ_start + duration
+                occurrence_time = occ_start
+                applied_sub_id = None
+                applied_exception = None  
 
-                candidates = []
-
-                for ex in exceptions:
-                    if ex.apply_range == "All time":
-                        candidates.append((1, ex))  # lowest priority
-                    elif ex.apply_range == "This and future":
-                        if ex.occurrence_time and occ_start >= ex.occurrence_time:
-                            candidates.append((2, ex))  # medium priority
-                    elif ex.apply_range == "This time":
-                        if occ_start == ex.occurrence_time:
-                            candidates.append((3, ex))  # highest priority
-
-                exception_to_apply = max(candidates, key=lambda x: x[0])[1] if candidates else None
-
-                if exception_to_apply:
-                    if exception_to_apply.exception_type == "skip":
-                        continue
-                    elif exception_to_apply.exception_type == "modify":
-                        if exception_to_apply.apply_range == "This time":
-                            occ_start = exception_to_apply.new_start_time
-                            occ_end = exception_to_apply.new_end_time
-                        else: 
-                            delta = exception_to_apply.new_start_time - exception_to_apply.occurrence_time
-                            occ_start = occ_start + delta
-                            occ_end = occ_end + delta
-
-
-
-                occurrences_list.append({
-                    "parent": exception_to_apply.event if exception_to_apply else event,
-                    "sub_id": exception_to_apply.sub_id if exception_to_apply else None,
-                    "occurrence_time": exception_to_apply.occurrence_time if exception_to_apply else occ_start,
-                    "title": exception_to_apply.new_title if exception_to_apply and exception_to_apply.new_title else       event.title,
-                    "note": exception_to_apply.new_note if exception_to_apply and exception_to_apply.new_note else event.       note,
-                    "link": exception_to_apply.new_link if exception_to_apply and exception_to_apply.new_link else event.       link,
-                    "extra_info": exception_to_apply.new_extra_info if exception_to_apply and exception_to_apply.       new_extra_info else event.extra_info,
-                    "start_time": occ_start if not exception_to_apply else (exception_to_apply.new_start_time if exception_to_apply.apply_range == "This time" else occ_start + (exception_to_apply.new_start_time - exception_to_apply.occurrence_time)),
-                    "end_time": occ_end if not exception_to_apply else (exception_to_apply.new_end_time if exception_to_apply.apply_range == "This time"else occ_end + (exception_to_apply.new_end_time - exception_to_apply.occurrence_time)
-    ),
-                    "type": exception_to_apply.new_type if exception_to_apply and exception_to_apply.new_type else event.       type,
+                for ex in all_exceptions:
+                    if applied_exception:
+                        if applied_exception.apply_range == "This time":
+                            break
+                        elif applied_exception.apply_range in ("This and future", "All time") and ex.apply_range in ("This          and future", "All time"):
+                            break
+                    if ex.exception_type == "skip":
+                        if ex.apply_range == "This time" and occ_start == ex.occurrence_time:
+                            occ_start = occ_end = None
+                            applied_sub_id = ex.sub_id
+                            occurrence_time = ex.occurrence_time
+                            applied_exception = ex
+                            break
+                        elif ex.apply_range == "This and future" and occ_start >= ex.occurrence_time:
+                            occ_start = occ_end = None
+                            applied_sub_id = ex.sub_id
+                            applied_exception = ex
+                            break
+                        elif ex.apply_range == "All time":
+                            occ_start = occ_end = None
+                            applied_sub_id = ex.sub_id
+                            applied_exception = ex
+                            break
+                    elif ex.exception_type == "modify":
+                        if ex.apply_range == "This time" and occ_start == ex.occurrence_time:
+                            occ_start = ex.new_start_time
+                            occ_end = ex.new_end_time
+                            applied_sub_id = ex.sub_id
+                            occurrence_time = ex.occurrence_time
+                            applied_exception = ex
+                            break
+                        elif ex.apply_range in ("This and future", "All time") and occ_start >= ex.occurrence_time:
+                            delta = ex.new_start_time - ex.occurrence_time
+                            occ_start += delta
+                            occ_end += delta
+                            applied_sub_id = ex.sub_id
+                            applied_exception = ex
+                            break
+                        
+                if occ_start is None or occ_end is None:
+                    continue
+                
+                final_occurrences.append({
+                    "parent": event,
+                    "sub_id": applied_sub_id,
+                    "occurrence_time": occurrence_time,
+                    "title": event.title,
+                    "note": event.note,
+                    "link": event.link,
+                    "extra_info": event.extra_info,
+                    "start_time": occ_start,
+                    "end_time": occ_end,
+                    "type": event.type,
                 })
+
+
+            occurrences_list.extend(final_occurrences)
+
         #serialize and return
         serializer = self.get_serializer(list(events_list)+occurrences_list, many=True)
         return Response(serializer.data)
@@ -171,12 +198,9 @@ class EventExceptionViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
 
         data = request.data.copy()
-
-        occurrence_time = data.get("occurrence_time")
-        if not occurrence_time:
-            return Response({"error": "occurrence_time is required, need it to target which one"}, status=400)
         
         event_id = data.get("mother_id")
+
         if not event_id:
             return Response({"error": "You need a mother event to create exception"}, status=400)
 
@@ -190,7 +214,7 @@ class EventExceptionViewSet(viewsets.ModelViewSet):
             "new_link": event.link,
             "new_extra_info": event.extra_info,
             "new_note": event.note,
-            "new_type": event.type
+            "new_type": event.type,
         }
 
         for key, value in defaults.items():

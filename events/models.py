@@ -49,7 +49,7 @@ class EventException(models.Model):
 
     sub_id = models.AutoField(primary_key=True)
 
-    occurrence_time = models.DateTimeField() 
+    occurrence_time = models.DateTimeField(null=True,blank=True) 
 
     exception_type = models.CharField(
         max_length=20,
