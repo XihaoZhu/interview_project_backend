@@ -85,10 +85,7 @@ class EventViewSet(viewsets.ModelViewSet):
             exceptions = list(event.exceptions.all())
 
             # sort exceptions
-            all_exceptions = sorted(exceptions, key=lambda ex: (
-                {'All time': 1, 'This and future': 2, 'This time': 3}[ex.apply_range],
-                ex.modified_at or datetime.min
-            ),reverse=True)
+            all_exceptions = sorted(exceptions, key=lambda ex: ex.modified_at or datetime.min,reverse=True)
 
             # what we need
             final_occurrences = []
@@ -100,47 +97,41 @@ class EventViewSet(viewsets.ModelViewSet):
                 applied_sub_id = None
                 applied_exception = None  
 
-                for ex in all_exceptions:
-                    if applied_exception:
-                        if applied_exception.apply_range == "This time":
-                            break
-                        elif applied_exception.apply_range in ("This and future", "All time") and ex.apply_range in ("This          and future", "All time"):
-                            break
-                    if ex.exception_type == "skip":
-                        if ex.apply_range == "This time" and occ_start == ex.occurrence_time:
-                            occ_start = occ_end = None
-                            applied_sub_id = ex.sub_id
-                            occurrence_time = ex.occurrence_time
-                            applied_exception = ex
-                            break
-                        elif ex.apply_range == "This and future" and occ_start >= ex.occurrence_time:
-                            occ_start = occ_end = None
-                            applied_sub_id = ex.sub_id
-                            applied_exception = ex
-                            break
-                        elif ex.apply_range == "All time":
-                            occ_start = occ_end = None
-                            applied_sub_id = ex.sub_id
-                            applied_exception = ex
-                            break
-                    elif ex.exception_type == "modify":
-                        if ex.apply_range == "This time" and occ_start == ex.occurrence_time:
-                            occ_start = ex.new_start_time
-                            occ_end = ex.new_end_time
-                            applied_sub_id = ex.sub_id
-                            occurrence_time = ex.occurrence_time
-                            applied_exception = ex
-                            break
-                        elif ex.apply_range in ("This and future", "All time") and occ_start >= ex.occurrence_time:
-                            delta = ex.new_start_time - ex.occurrence_time
+                # Prioritize this time exception
+                thistime_ex = next(
+                    (ex for ex in all_exceptions 
+                     if ex.apply_range == "This time" and occ_start == ex.occurrence_time),
+                    None
+                )
+
+                if thistime_ex:
+                    # if it's this time skip, do nothing so the occ won't be appendded on list
+                    if thistime_ex.exception_type == "skip":
+                        continue  
+                    # if modify then directly take the new start and end
+                    elif thistime_ex.exception_type == "modify":
+                        occ_start = thistime_ex.new_start_time
+                        occ_end = thistime_ex.new_end_time
+                        applied_sub_id = thistime_ex.sub_id
+
+                else:
+                    # find the newest all time or future exception which can hit the occ
+                    future_ex = next(
+                        (ex for ex in all_exceptions
+                         if ex.apply_range in ("This and future", "All time")
+                         and occ_start >= ex.occurrence_time),
+                        None
+                    )
+                    if future_ex:
+                        if future_ex.exception_type == "skip":
+                            continue
+                        elif future_ex.exception_type == "modify":
+                            delta = future_ex.new_start_time - future_ex.occurrence_time
                             occ_start += delta
                             occ_end += delta
-                            applied_sub_id = ex.sub_id
-                            applied_exception = ex
-                            break
-                        
-                if occ_start is None or occ_end is None:
-                    continue
+                            applied_sub_id = future_ex.sub_id
+                            applied_exception = future_ex
+
                 
                 final_occurrences.append({
                     "parent": event,
