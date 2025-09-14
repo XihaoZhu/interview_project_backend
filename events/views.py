@@ -144,6 +144,7 @@ class EventViewSet(viewsets.ModelViewSet):
                 event_copy.occurrence_time = occurrence_time
                 event_copy.sub_id = applied_sub_id
                 event_copy.this_time_ex = this_time_ex 
+                event_copy.parent = event
 
                 final_occurrences.append(event_copy)
 
