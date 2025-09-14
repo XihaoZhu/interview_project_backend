@@ -72,7 +72,7 @@ class EventViewSet(viewsets.ModelViewSet):
         occurrences_list = []
 
         for event in rrule_events:
-            localStart = event.start_time.astimezone(user_tz)
+            localStart = event.start_time.astimezone(ZoneInfo(event.buid_timeZone))
             rule = rrulestr(event.repeat_rule, dtstart=localStart)
 
             #occurrences
@@ -92,7 +92,7 @@ class EventViewSet(viewsets.ModelViewSet):
             final_occurrences = []
 
             for i, occ_start in enumerate(occurrences):
-                occ_start = occ_start.astimezone(timezone.utc)
+                occ_start = occ_start.astimezone(user_tz)
                 occ_end = occ_start + duration
                 occurrence_time = occ_start
                 applied_sub_id = None
